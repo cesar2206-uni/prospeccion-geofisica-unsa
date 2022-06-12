@@ -4,35 +4,40 @@
 ## Librerias
 from pandas import DataFrame, read_csv
 import plotly.graph_objects as go
-from numpy import split, where, array, reshape, arange
+from numpy import split, where, array, reshape, arange, cos, arcsin, repeat
+from sklearn import linear_model
 
 ## Entrada de datos
 
-data = read_csv("registro_2.txt",skiprows = 1, sep = "\t", header = None, names = ["x", "t"])
-print(data)
-x = data["x"].to_numpy()
-y = data["t"].to_numpy()
+def data_reading(path):
+    """
+    This function with the path of the .txt, create a dataframe with the values
+    """
+    data = read_csv(path ,skiprows = 1, sep = "\t", header = None, names = ["x", "t"])
+    return data
 
-## Ploteo inicial
-fig = go.Figure()
-fig.add_trace(go.Scatter(x = data["x"], y = data["t"],
-                         mode = "markers",
-                         name = "Puntos registrados"
-))
+def initial_plot(data):
+    """
+    This function plot a scatter plot of the data, to choose the data for each regression  
+    """    
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x = data["x"], y = data["t"],
+                             mode = "markers",
+                             name = "Puntos registrados"
+    ))
 
-fig.update_layout(xaxis_title = "Distancia de la fuente (m)",
-                  yaxis_title = "Tiempo de viaje (ms)",
-                  title = "Ensayo de Refracción Sísmica - Dromocrona registrada",
-                  font = dict(size = 18)
-                  ) 
-fig.show()
+    fig.update_layout(xaxis_title = "Distancia de la fuente (m)",
+                      yaxis_title = "Tiempo de viaje (ms)",
+                      title = "Ensayo de Refracción Sísmica - Dromocrona registrada",
+                      font = dict(size = 18)
+                      ) 
+    fig.show()
+    return 0
 
-## Puntos de Inflexión
-x_separation_values = [2]
-y_separation_values = [y[where(x == value)] for value in x_separation_values]
-
-## Busqueda de los cambios de pendiente
 def special_split(arr, separation_values):
+    """
+    Function to split a list
+    """
     separated_list =[]
     for i, value in enumerate(separation_values):
         if i == 0: 
@@ -46,78 +51,176 @@ def special_split(arr, separation_values):
             separated_list.append(l_sup)
     return separated_list
 
-## Regresiones lineales
-from sklearn import linear_model
+def data_processing(data, inflexion_points, results = "plot"):
+    """
+    This function is the principal to process data of seismic refaction:
+    data = dataframe of the seismic refraction data
+    inflexion_points = a list of the points with change of the slope, for example : [106], specifically of the distance
+    results: a string which select the type of results
+    """
+    ## Initial scatter plot
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x = data["x"], y = data["t"],
+                             mode = "markers",
+                             name = "Puntos registrados"
+    ))
 
-X = special_split(x, x_separation_values)
-Y = special_split(y, y_separation_values)
+    fig.update_layout(xaxis_title = "Distancia de la fuente (m)",
+                      yaxis_title = "Tiempo de viaje (ms)",
+                      title = "Ensayo de Refracción Sísmica - Dromocrona registrada",
+                      font = dict(size = 18)
+                      ) 
 
-regression_results, velocities, intersections = [], [], []
+    # Transformation of dataframe in array
+    x = data["x"].to_numpy()
+    y = data["t"].to_numpy()
 
-for i in range(len(X)):
+    # Inflexion points
+    x_separation_values = inflexion_points
+    y_separation_values = [y[where(x == value)] for value in
+                       x_separation_values]
+
+    # Searching the slopes changes
+    ## Linear regresion
+
+    X = special_split(x, x_separation_values)
+    Y = special_split(y, y_separation_values)
+
+    regression_results, velocities, intersections = [], [], []
+
+    for i in range(len(X)):
     
-    # Obtención de Velocidades
-    reg = linear_model.LinearRegression()
-    X_1 = reshape(X[i],(-1, 1))
-    reg.fit(X_1, Y[i])
-    regression_results.append([reg.coef_, reg.intercept_, reg.score(X_1, Y[i])])
-    velocities.append(1 / reg.coef_)
+        ## Velocities 
+        reg = linear_model.LinearRegression()
+        X_1 = reshape(X[i],(-1, 1))
+        reg.fit(X_1, Y[i])
+        regression_results.append([reg.coef_, reg.intercept_, reg.score(X_1, Y[i])])
+        velocities.append(1 / reg.coef_)
     
-    # Obtención de Intersecciones
-    if i > 0:
-        reg_previous = linear_model.LinearRegression()
-        X_2 = reshape(X[i-1],(-1, 1))
-        reg_previous.fit(X_2, Y[i-1])
-        intersections.append(-(reg_previous.intercept_ - reg.intercept_) / (reg_previous.coef_ - reg.coef_))
+        ## Intersections in linear regressions
+        if i > 0:
+            reg_previous = linear_model.LinearRegression()
+            X_2 = reshape(X[i-1],(-1, 1))
+            reg_previous.fit(X_2, Y[i-1])
+            intersections.append(-(reg_previous.intercept_ - reg.intercept_) / (reg_previous.coef_ - reg.coef_))
     
-        # Ploteo de las regresiones lineales
-        if i == 1:
-            Y_pred_0 = reg_previous.predict(reshape(arange(X[i-1][0], intersections[i-1], 0.1),(-1, 1)))
-            fig.add_trace(go.Scatter(x = arange(X[i-1][0], intersections[i-1], 0.1), y = Y_pred_0,
-                             mode = "lines",
-                             name = "Estrato 1"))
+            ## Linear regression ploting
+            if i == 1:
+                Y_pred_0 = reg_previous.predict(reshape(arange(X[i-1][0], intersections[i-1], 0.1),(-1, 1)))
+                fig.add_trace(go.Scatter(x = arange(X[i-1][0], intersections[i-1], 0.1), y = Y_pred_0,
+                                 mode = "lines",
+                                 name = "Estrato 1"))
 
-            Y_pred_1 = reg.predict(reshape(arange(intersections[i-1], X[i][-1], 0.1),(-1, 1)))
-            fig.add_trace(go.Scatter(x = arange(intersections[i-1],X[i][-1], 0.1), y = Y_pred_1,
-                             mode = "lines",
-                             name = "Estrato 2"))
-        else:
-            Y_pred_i = reg.predict(reshape(arange(intersections[i-1], X[i][-1], 0.1),(-1, 1)))
-            fig.add_trace(go.Scatter(x = arange(intersections[i-1],X[i][-1], 0.1), y = Y_pred_i,
-                             mode = "lines",
-                             name = "Estrato "+str(i+1)))
-fig.update_layout(xaxis_title = "Distancia de la fuente (m)",
-                  yaxis_title = "Tiempo de viaje (ms)",
-                  title = "Ensayo de Refracción Sísmica - Dromocrona registrada",
-                  font = dict(size = 18)
-                  ) 
-fig.show()
+                Y_pred_1 = reg.predict(reshape(arange(intersections[i-1], X[i][-1], 0.1),(-1, 1)))
+                fig.add_trace(go.Scatter(x = arange(intersections[i-1],X[i][-1], 0.1), y = Y_pred_1,
+                                 mode = "lines",
+                                 name = "Estrato 2"))
+            else:
+                Y_pred_i = reg.predict(reshape(arange(intersections[i-1], X[i][-1], 0.1),(-1, 1)))
+                fig.add_trace(go.Scatter(x = arange(intersections[i-1],X[i][-1], 0.1), y = Y_pred_i,
+                                 mode = "lines",
+                                 name = "Estrato "+str(i+1)))
+    fig.update_layout(xaxis_title = "Distancia de la fuente (m)",
+                      yaxis_title = "Tiempo de viaje (ms)",
+                      title = "Ensayo de Refracción Sísmica - Dromocrona registrada",
+                      font = dict(size = 18)
+                      ) 
 
-## Cálculo de espesores
-Z = []
-for i in range(len(x_separation_values)):
-    t_i = regression_results[i+1][1]
-    Z.append(t_i * velocities[i] * velocities[i+1] / (2 * ((velocities[i+1] ** 2 - velocities[i] ** 2)**0.5)))
+    # Soil Thicknesses
+    Z = []
+    for i in range(len(x_separation_values)):
+        t_i = regression_results[i+1][1]
+        Z.append(t_i * velocities[i] * velocities[i+1] / (2 * ((velocities[i+1] ** 2 - velocities[i] ** 2)**0.5)))
 
-fig.update_layout(xaxis_title = "Distancia de la fuente (m)",
-                  yaxis_title = "Tiempo de viaje (ms)",
-                  title = "Ensayo de Refracción Sísmica - Dromocrona registrada",
-                  font = dict(size = 18)
-                  ) 
-## Resultados
+    fig.update_layout(xaxis_title = "Distancia de la fuente (m)",
+                      yaxis_title = "Tiempo de viaje (ms)",
+                      title = "Ensayo de Refracción Sísmica - Dromocrona registrada",
+                      font = dict(size = 18)
+                      ) 
+    # Results
+    if results == "plot":
+        fig.show()
+        return 0
+    
+    elif results == "thickness":
+        return Z
+    
+    elif results == "velocities":
+        return velocities
+    
+    elif results == "regression_results":
+        return regression_results
+    
+    elif results == "critical_distances":
+        return intersections
 
-print("Espesores")
-print(Z)
+    else:
+        return 0
 
-print("Velocidades")
-print(velocities)
+def redpath_method(data_1, data_2, V1, V2_A, V2_B, result = "table"):
+    """
+    Function of the redpath method to obtain the thicknesses of all the line with geophones
+    The data_2 is the domocronic of the right side
+    results = {table, plot}
+    """
+    # Data reading
+    redpath_data = DataFrame()
+    redpath_data["x"] = data_1["x"]
+    redpath_data["T_D1"] = data_1["t"]
+    redpath_data["T_D2"] = data_2[::-1].reset_index(drop = True)["t"]
+    
+    if max(data_1["t"]) == max(data_2["t"]):
+        print("T_t is correct")
+        T_t = max(data_1["t"])
+    else:
+        print("T_t is'nt correct, check the last geophone departure tim")
+        return 0
 
-print("Resultados de la regresión [a, b, R2]")
-print(regression_results)
+    # Redpath Method
+    redpath_data["dT"] = 0.5 * (redpath_data["T_D1"] + redpath_data["T_D2"] - T_t)
+    redpath_data["Zd_A"] = redpath_data["dT"] * V1 / cos(arcsin(V1/V2_A))/1000
+    redpath_data["Zd_B"] = redpath_data["dT"] * V1 / cos(arcsin(V1/V2_B))/1000
 
-print("Distancias críticas")
-print(intersections)
+    # Plot processing
+    X = redpath_data["x"].to_numpy()
+    Y_surface = repeat(0, len(X))
+    Y_redpath_A = redpath_data["Zd_A"]
+    Y_redpath_B = redpath_data["Zd_B"]
 
+    # Results
+    if result == "table":
+        return redpath_data
+    elif result == "plot":
+        fig = go.Figure()
+        fig.add_trace(
+            go.Scatter(x = X, y = Y_surface,
+                       mode = "lines",
+                       name = "Superficie"
+            )
+        )
+        
+        fig.add_trace(
+            go.Scatter(x = X, y = Y_redpath_A,
+                       mode = "lines",
+                       name = "Estrato 1 <br> V2 = V2A"
+            )
+        )
+        fig.add_trace(
+            go.Scatter(x = X, y = Y_redpath_B,
+                       mode = "lines",
+                       name = "Estrato 1 <br> V2 = V2B"
+            )
+        )
+        fig.update_yaxes(autorange="reversed")
+        fig.update_layout(xaxis_title = "Distancia (m)",
+                      yaxis_title = "Profundidad (m)",
+                      title = "Ensayo de Refracción Sísmica - Método de Redpath",
+                      font = dict(size = 18)
+                      ) 
 
-
+        fig.show()
+        return 0
+    else:
+        print("Incorrect results value")
+        return 0
 
