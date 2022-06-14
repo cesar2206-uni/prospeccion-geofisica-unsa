@@ -70,7 +70,10 @@ def data_processing(data, inflexion_points, results = "plot"):
                       title = "Ensayo de Refracción Sísmica - Dromocrona registrada",
                       font = dict(size = 18)
                       ) 
-    fig.show()
+    if results == "plot":
+        fig.show()
+    else:
+        pass
     # Transformation of dataframe in array
     x = data["x"].to_numpy()
     y = data["t"].to_numpy()
@@ -157,7 +160,7 @@ def data_processing(data, inflexion_points, results = "plot"):
     else:
         return 0
 
-def redpath_method(data_1, data_2, V1, V2_A, V2_B, result = "table"):
+def redpath_method(data_1, data_2, inflexion_1, inflexion_2, result = "table"):
     """
     Function of the redpath method to obtain the thicknesses of all the line with geophones
     The data_2 is the domocronic of the right side
@@ -166,12 +169,22 @@ def redpath_method(data_1, data_2, V1, V2_A, V2_B, result = "table"):
     # Data reading
     redpath_data = DataFrame()
     redpath_data["x_1"] = data_1["x"]
-    redpath_data["x_2"] = data_2[::-1].reset_index(drop = True)["t"]
-    #redpath_data["T_D1"] = data_1["t"]
-    #redpath_data["T_D2"] = data_2[::-1].reset_index(drop = True)["t"]
+    redpath_data["x_2"] = data_2[::-1].reset_index(drop = True)["x"]
     
+    # Regresion results and velocities
+    reg_res_1 = data_processing(data_1, inflexion_1, "regression_results")
+    reg_res_2 = data_processing(data_2, inflexion_2, "regression_results")
+    V_A = data_processing(data_1, inflexion_1, "velocities")
+    V_B = data_processing(data_2, inflexion_2, "velocities")
+    V_1 = (V_A[0] + V_B[0])/2
+    i_c = 0.5 * (arcsin(V_1/V_A[1]) + arcsin(V_1/V_B[1]))
+
+    # Interpolation with the regressions
+    redpath_data["T_D1"] = redpath_data["x_1"] * reg_res_1[1][0] + reg_res_1[1][1]
+    redpath_data["T_D2"] = redpath_data["x_2"] * reg_res_2[1][0] + reg_res_2[1][1]
+    
+    # Verification 
     if max(data_1["t"]) == max(data_2["t"]):
-        print("T_t is correct")
         T_t = max(data_1["t"])
     else:
         print("T_t is'nt correct, check the last geophone departure tim")
@@ -179,14 +192,12 @@ def redpath_method(data_1, data_2, V1, V2_A, V2_B, result = "table"):
 
     # Redpath Method
     redpath_data["dT"] = 0.5 * (redpath_data["T_D1"] + redpath_data["T_D2"] - T_t)
-    redpath_data["Zd_A"] = redpath_data["dT"] * V1 / cos(arcsin(V1/V2_A))/1000
-    redpath_data["Zd_B"] = redpath_data["dT"] * V1 / cos(arcsin(V1/V2_B))/1000
+    redpath_data["Zd"] = redpath_data["dT"] * V_1 / cos(i_c)
 
     # Plot processing
-    X = redpath_data["x"].to_numpy()
+    X = redpath_data["x_1"].to_numpy()
     Y_surface = repeat(0, len(X))
-    Y_redpath_A = redpath_data["Zd_A"]
-    Y_redpath_B = redpath_data["Zd_B"]
+    Y_redpath = redpath_data["Zd"]
 
     # Results
     if result == "table":
@@ -201,24 +212,17 @@ def redpath_method(data_1, data_2, V1, V2_A, V2_B, result = "table"):
         )
         
         fig.add_trace(
-            go.Scatter(x = X, y = Y_redpath_A,
+            go.Scatter(x = X, y = Y_redpath,
                        mode = "lines",
-                       name = "Estrato 1 <br> V2 = V2A"
+                       name = "Estrato 1"
             )
         )
-        fig.add_trace(
-            go.Scatter(x = X, y = Y_redpath_B,
-                       mode = "lines",
-                       name = "Estrato 1 <br> V2 = V2B"
-            )
-        )
-        fig.update_yaxes(autorange="reversed")
         fig.update_layout(xaxis_title = "Distancia (m)",
                       yaxis_title = "Profundidad (m)",
                       title = "Ensayo de Refracción Sísmica - Método de Redpath",
                       font = dict(size = 18)
                       ) 
-
+        fig.update_yaxes(autorange="reversed")
         fig.show()
         return 0
     else:
