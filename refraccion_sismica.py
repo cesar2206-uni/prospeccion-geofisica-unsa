@@ -70,7 +70,7 @@ def data_processing(data, inflexion_points, results = "plot"):
                       title = "Ensayo de Refracción Sísmica - Dromocrona registrada",
                       font = dict(size = 18)
                       ) 
-
+    fig.show()
     # Transformation of dataframe in array
     x = data["x"].to_numpy()
     y = data["t"].to_numpy()
@@ -165,9 +165,10 @@ def redpath_method(data_1, data_2, V1, V2_A, V2_B, result = "table"):
     """
     # Data reading
     redpath_data = DataFrame()
-    redpath_data["x"] = data_1["x"]
-    redpath_data["T_D1"] = data_1["t"]
-    redpath_data["T_D2"] = data_2[::-1].reset_index(drop = True)["t"]
+    redpath_data["x_1"] = data_1["x"]
+    redpath_data["x_2"] = data_2[::-1].reset_index(drop = True)["t"]
+    #redpath_data["T_D1"] = data_1["t"]
+    #redpath_data["T_D2"] = data_2[::-1].reset_index(drop = True)["t"]
     
     if max(data_1["t"]) == max(data_2["t"]):
         print("T_t is correct")
