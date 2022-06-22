@@ -272,15 +272,13 @@ def wavefront_method(data_1, data_2, inflexion_1, inflexion_2, result = "table")
     
     # Selection of points
     
-    t_1 = data_1["t"].iloc[1]
-    t_2 = data_2["t"].iloc[-2:-1]
+    t = round(max(reg_res_1[1][1], reg_res_2[1][1])) + 10
     
-    t1_values = array([t_1, t_1 + dt, t_1 + 2 * dt])
-    t2_values = array([t_2 - 2 * dt, t_2 - dt, t_2])
-    print(t1_values, t2_values)
+    t_values = array([t, t + dt, t + 2 * dt])
 
-    left_values = (t1_values - reg_res_1[1][1]) / reg_res_1[1][0]
-    right_values = (t2_values - reg_res_2[1][1]) / reg_res_2[1][0] 
+    left_values = (t_values - reg_res_1[1][1]) / reg_res_1[1][0]
+    right_values = data_2["x"].iloc[-1] - (t_values - reg_res_2[1][1]) / reg_res_2[1][0] 
+    right_values = right_values[::-1]
     print(left_values, right_values)
     
     # Result of intersections
@@ -288,5 +286,5 @@ def wavefront_method(data_1, data_2, inflexion_1, inflexion_2, result = "table")
     
     # 2nd Velocitie obtained
     V_2 = (XY[1][0] - XY[0][0])/10
-    return XY
+    return V_2 
     
