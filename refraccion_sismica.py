@@ -4,7 +4,7 @@
 ## Librerias
 from pandas import DataFrame, read_csv
 import plotly.graph_objects as go
-from numpy import split, where, array, reshape, arange, cos, arcsin, repeat
+from numpy import split, where, array, reshape, arange, cos, arcsin, repeat, tan
 from sklearn import linear_model
 
 ## Entrada de datos
@@ -229,3 +229,64 @@ def redpath_method(data_1, data_2, inflexion_1, inflexion_2, result = "table"):
         print("Incorrect results value")
         return 0
 
+def wavefront_procedure(x_left, x_right, ratio):
+    """
+    The wavefront method, based in the x vector of results in each dt, for the second velocity line obtained in the linear regression
+    """
+    x_left = array(x_left)
+    x_right = array(x_right)
+
+    L_left = array([x_left[i+1] - x_left[i] for i in range(len(x_left)-1)])
+    L_right= array([x_right[i+1] - x_right[i] for i in range(len(x_right)-1)])
+
+    m_left = -tan(arcsin(ratio/L_left)) # Slope of the line
+    m_right = tan(arcsin(ratio/L_right)) # Slope of the line
+    b_left = -m_left * x_left[:-1]
+    b_right = -m_right * x_right[1:]
+#    for i in range(len(m_left)):  
+#        plt.plot(np.arange(0, 70, 1), m_left[i] * np.arange(0, 70, 1) + b_left[i])
+#        plt.plot(np.arange(0, 70, 1), m_right[i] * np.arange(0, 70, 1) + b_right[i])
+#   plt.show()
+    x_1 = - (b_left - b_right)/(m_left - m_right)
+    y_1 = m_left * x_1 + b_left
+    return array([x_1, y_1]).T
+
+
+def wavefront_method(data_1, data_2, inflexion_1, inflexion_2, result = "table"):
+    """
+    Function of the wavefront method to obtain the second velocitie
+    The data_2 is the domocronic of the right side
+    results = {table, plot}
+    """
+    dt = 10 # ms
+    # Velocity in the first soil layer
+    V_A = data_processing(data_1, inflexion_1, "velocities")
+    V_B = data_processing(data_2, inflexion_2, "velocities")
+    V_1 = (V_A[0] + V_B[0])/2
+    
+    R = V_1 * dt # V in m/ms and dt in ms
+    
+    # Regresion results
+    reg_res_1 = data_processing(data_1, inflexion_1, "regression_results")
+    reg_res_2 = data_processing(data_2, inflexion_2, "regression_results")
+    
+    # Selection of points
+    
+    t_1 = data_1["t"].iloc[1]
+    t_2 = data_2["t"].iloc[-2:-1]
+    
+    t1_values = array([t_1, t_1 + dt, t_1 + 2 * dt])
+    t2_values = array([t_2 - 2 * dt, t_2 - dt, t_2])
+    print(t1_values, t2_values)
+
+    left_values = (t1_values - reg_res_1[1][1]) / reg_res_1[1][0]
+    right_values = (t2_values - reg_res_2[1][1]) / reg_res_2[1][0] 
+    print(left_values, right_values)
+    
+    # Result of intersections
+    XY = wavefront_procedure(left_values, right_values, R)
+    
+    # 2nd Velocitie obtained
+    V_2 = (XY[1][0] - XY[0][0])/10
+    return XY
+    
