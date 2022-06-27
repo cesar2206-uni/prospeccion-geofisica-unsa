@@ -4,7 +4,7 @@
 ## Librerias
 from pandas import DataFrame, read_csv
 import plotly.graph_objects as go
-from numpy import split, where, array, reshape, arange, cos, arcsin, repeat, tan
+from numpy import split, where, array, reshape, arange, cos, arcsin, repeat, tan, sin, pi, linspace
 from sklearn import linear_model
 
 ## Entrada de datos
@@ -229,7 +229,7 @@ def redpath_method(data_1, data_2, inflexion_1, inflexion_2, result = "table"):
         print("Incorrect results value")
         return 0
 
-def wavefront_procedure(x_left, x_right, ratio):
+def wavefront_procedure(x_left, x_right, ratio, x_max):
     """
     The wavefront method, based in the x vector of results in each dt, for the second velocity line obtained in the linear regression
     """
@@ -243,10 +243,72 @@ def wavefront_procedure(x_left, x_right, ratio):
     m_right = tan(arcsin(ratio/L_right)) # Slope of the line
     b_left = -m_left * x_left[:-1]
     b_right = -m_right * x_right[1:]
-#    for i in range(len(m_left)):  
-#        plt.plot(np.arange(0, 70, 1), m_left[i] * np.arange(0, 70, 1) + b_left[i])
-#        plt.plot(np.arange(0, 70, 1), m_right[i] * np.arange(0, 70, 1) + b_right[i])
-#   plt.show()
+    
+     
+    # Function of the ellipse 
+    def ellipse_arc(x_center=0, y_center=0, a=1, b =1, start_angle=0, end_angle=2*pi, N=100, closed= False):
+        t = linspace(start_angle, end_angle, N)
+        x = x_center + a*cos(t)
+        y = y_center + b*sin(t)
+        path = f'M {x[0]}, {y[0]}'
+        for k in range(1, len(t)):
+            path += f'L{x[k]}, {y[k]}'
+        if closed:
+            path += ' Z'
+        return path    
+    
+    fig = go.Figure()
+
+    for i in range(len(m_left)):
+    
+    # Plottling the lines
+        fig.add_trace(go.Scatter(
+            x = arange(0, x_max, 1),
+            y = m_left[i] * arange(0, x_max, 1) + b_left[i],
+            mode = "lines",
+            name = "Line " + str(i + 1)
+        ))
+        fig.add_trace(go.Scatter(
+            x = arange(0, x_max, 1),
+            y = m_right[i] * arange(0, x_max, 1) + b_right[i],
+            mode = "lines",
+            name = "Line " + str(i + 1) + "*"
+        ))
+    fig.add_trace(go.Scatter(
+        x = arange(0, x_max, 1),
+        y = 0 * arange(0, x_max, 1) ,
+        mode = "lines",
+        name = "Eje x",
+        line_color="black"))
+        
+    # Plotting the circles
+    fig.update_layout(
+        shapes=[
+            dict(type="path",
+            path= ellipse_arc(x_center = x_left[0], a = ratio, b = ratio, start_angle= pi , end_angle = 2 * pi, N=60),
+            line_color="RoyalBlue"),
+            dict(type="path",
+            path= ellipse_arc(x_center = x_left[1], a = ratio, b = ratio, start_angle= pi , end_angle = 2 * pi, N=60),
+            line_color="RoyalBlue"),
+            dict(type="path",
+            path= ellipse_arc(x_center = x_left[2], a = ratio, b = ratio, start_angle= pi , end_angle = 2 * pi, N=60),
+            line_color="RoyalBlue"),
+            dict(type="path",
+            path= ellipse_arc(x_center = x_right[0], a = ratio, b = ratio, start_angle= pi , end_angle = 2 * pi, N=60),
+            line_color="orange"),
+            dict(type="path",
+            path= ellipse_arc(x_center = x_right[1], a = ratio, b = ratio, start_angle= pi , end_angle = 2 * pi, N=60),
+            line_color="orange"),
+            dict(type="path",
+            path= ellipse_arc(x_center = x_right[2], a = ratio, b = ratio, start_angle= pi , end_angle = 2 * pi, N=60),
+            line_color="orange")
+           ])
+    fig.update_layout(xaxis_title = "Distancia de la fuente (m)",
+                       yaxis_title = "Tiempo de viaje (ms)",
+                       title = "Ensayo de Refracción Sísmica - Método de frente de ondas",
+                      font = dict(size = 18)
+                      ) 
+    fig.show()
     x_1 = - (b_left - b_right)/(m_left - m_right)
     y_1 = m_left * x_1 + b_left
     return array([x_1, y_1]).T
@@ -259,7 +321,8 @@ def wavefront_method(data_1, data_2, inflexion_1, inflexion_2, result = "table")
     results = {table, plot}
     """
     dt = 10 # ms
-    # Velocity in the first soil layer
+    x_max = max(data_1["x"])
+    #Velocity in the first soil layer
     V_A = data_processing(data_1, inflexion_1, "velocities")
     V_B = data_processing(data_2, inflexion_2, "velocities")
     V_1 = (V_A[0] + V_B[0])/2
@@ -272,19 +335,19 @@ def wavefront_method(data_1, data_2, inflexion_1, inflexion_2, result = "table")
     
     # Selection of points
     
-    t = round(max(reg_res_1[1][1], reg_res_2[1][1])) + 10
-    
-    t_values = array([t, t + dt, t + 2 * dt])
+    t = reg_res_1[1][1] + 5 
+    t_2 = reg_res_2[1][1] + 5
 
+    t_values = array([t, t + dt, t + 2 * dt])
+    t_values_2 = array([t_2, t_2 + dt, t_2 + 2 * dt])
     left_values = (t_values - reg_res_1[1][1]) / reg_res_1[1][0]
-    right_values = data_2["x"].iloc[-1] - (t_values - reg_res_2[1][1]) / reg_res_2[1][0] 
+    right_values = data_2["x"].iloc[-1] - (t_values_2 - reg_res_2[1][1]) / reg_res_2[1][0] 
     right_values = right_values[::-1]
-    print(left_values, right_values)
     
     # Result of intersections
-    XY = wavefront_procedure(left_values, right_values, R)
-    
+    XY = wavefront_procedure(left_values, right_values, R, x_max)
+    print(XY) 
     # 2nd Velocitie obtained
-    V_2 = (XY[1][0] - XY[0][0])/10
+    V_2 = (((XY[1][0] - XY[0][0]) ** 2 + (XY[1][1] - XY[0][1]) ** 2) ** 0.5 )/dt
     return V_2 
     
