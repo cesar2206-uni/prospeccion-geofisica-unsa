@@ -213,7 +213,7 @@ def redpath_method(data_1, data_2, inflexion_1, inflexion_2, result = "table"):
         
         fig.add_trace(
             go.Scatter(x = X, y = Y_redpath,
-                       mode = "lines",
+                       mode = "lines+markers",
                        name = "Estrato 1"
             )
         )
@@ -320,7 +320,7 @@ def wavefront_method(data_1, data_2, inflexion_1, inflexion_2, result = "table")
     The data_2 is the domocronic of the right side
     results = {table, plot}
     """
-    dt = 10 # ms
+    dt = 5 # ms
     x_max = max(data_1["x"])
     #Velocity in the first soil layer
     V_A = data_processing(data_1, inflexion_1, "velocities")
@@ -349,5 +349,6 @@ def wavefront_method(data_1, data_2, inflexion_1, inflexion_2, result = "table")
     print(XY) 
     # 2nd Velocitie obtained
     V_2 = (((XY[1][0] - XY[0][0]) ** 2 + (XY[1][1] - XY[0][1]) ** 2) ** 0.5 )/dt
+    print(V_2 * dt)
     return V_2 
     
